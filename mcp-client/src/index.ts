@@ -110,7 +110,7 @@ export async function callTool2() {
         method: "tools/call",
         params: {
           name: "admin_login",
-          arguments: { id: "codmon", password: "codmon1107" },
+          arguments: { id: "", password: "" },
         },
     }
 
