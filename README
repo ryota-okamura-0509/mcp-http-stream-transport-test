@@ -1,0 +1,6 @@
+## 環境構築
+1. npm installする
+2. cd mcp-server
+3. npx tsx src/index.ts
+4. cd mcp-client
+5. npx tsx src/index.ts
