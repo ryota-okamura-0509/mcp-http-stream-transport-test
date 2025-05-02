@@ -3,6 +3,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { z } from "zod";
 import express from "express";
 import https from "https";
+import dotenv from "dotenv";
 
 const agent = new https.Agent({
     rejectUnauthorized: false, // 証明書検証を無効化
@@ -40,24 +41,29 @@ mcpServer.tool(
     };
   }
 );
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 mcpServer.tool(
-    'admin_login',
-    "管理者ログイン",
-    {id: z.string().describe("ユーザーID"), password: z.string().describe("パスワード")},
+    'get_classes',
+    "クラス情報を取得",
+    {id: z.string().describe("サービスID")},
     async (input) => {
-        const { id, password } = input;
+        const { id } = input;
+        // TODO; envにまとめたい
+        const body = new URLSearchParams({
+          client_id: "",
+          client_secret: "",
+          username: '',
+          password: "",
+          grant_type: "",
+        });
         try {
-            const res = await fetch("ここをログイン用のURLにする", {
+            const res = await fetch("url/oauth/token", {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/json",
+                  "Content-Type": "application/x-www-form-urlencoded",
+                  "Accept": "application/json",
                 },
-                body: JSON.stringify({
-                    id,
-                    password,
-                })
+                body: body 
             });
             console.log("Response:", res);
 
@@ -66,11 +72,25 @@ mcpServer.tool(
             }
 
             const data = await res.json();
+            const accessToken = data.access_token;
+            console.log("Access Token:", accessToken);
+
+            const classRes = await fetch(`url/api/v1/classes?service_id=2&limit=50&offset=0`, {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Accept": "application/json",
+                "Authorization": ``,
+              },
+            });
+
+            const classes = await classRes.json();
+            console.log("対象クラス:", classes);
             return {
                 content: [
                     {
                         type: "text",
-                        text: `Login successful: ${JSON.stringify(data)}`,
+                        text: `対象クラス一覧: ${JSON.stringify(classes)}`,
                     },
                 ],
             };

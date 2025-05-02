@@ -7,6 +7,7 @@ import {
     CallToolRequest,
     CallToolResultSchema,
   } from "@modelcontextprotocol/sdk/types.js";
+  import express from "express";
 
   import https from "https";
 
@@ -18,9 +19,27 @@ const transport = new StreamableHTTPClientTransport(
 )
 
 const response = {
-  text: "",
-  type: "text",
-}
+    text: "",
+    type: "text",
+  }
+
+const app = express();
+app.use(express.json());
+
+
+app.get("/classes", async (req, res) => {
+    const answer = await callTool2();
+    console.log("answer", answer);
+    res.json({
+        message: "Action completed successfully",
+        content: answer,
+    });
+    await disconnect();
+  });
+
+app.listen(3003, () => {
+console.log("Server is running on http://localhost:3003/");
+});
 
 // filepath: /Users/r_okamura/Dev/private/http_mcp/mcp-server/src/index.ts
 const agent = new https.Agent({
@@ -42,39 +61,30 @@ const readline = createInterface({
 })
 
 async function main() {
+}
+
+async function selectAction(toolName: string) {
     try{
         await client.connect(transport);
         console.log("Connected to server");
-        while (true) {
-            console.log("avaible commands:");
-            console.log("1. list-tools");
-            console.log("2. call-tool");
-            console.log("3. get-classes");
-            console.log("4. exit");
-            console.log("------------------------------");
-
-            const answer = await readline.question("Enter your input: ");
-
-            switch (answer) {
-                case "1":
-                  await listTools();
-                  break;
-                case "2":
-                  await callTool();
-                  break;
-                case "3":
-                  await callTool2();
-                  break;
-                case "4":
-                  await disconnect();
-                  console.log("Disconnected from server.");
-                  return;
-         
-                default:
-                  console.log("You entered:", answer);
-                  break;
-            }
-
+        switch (toolName) {
+            case "list-tools":
+              await listTools();
+              break;
+            case "call-tool":
+              await callTool();
+              break;
+            case "get-classes":
+              await callTool2();
+              break;
+            case "exit":
+             
+              console.log("Disconnected from server.");
+              break;
+     
+            default:
+              console.log("You entered:",toolName);
+              break;
         }
     } catch (error) {
         console.error("Error:", error);
@@ -86,7 +96,6 @@ async function disconnect() {
     await client.close();
     readline.close();
     console.log("Disconnected from server.");
-    process.exit(0);
   }
 
 export async function listTools() {
@@ -109,29 +118,29 @@ export async function listTools() {
 }
 
 export async function callTool2() {
-    const sides = await readline.question(
-        "どの施設のクラスを取得しますか？: "
-    )
-    const req2: CallToolRequest = {
-        method: "tools/call",
-        params: {
-          name: "get_classes",
-          arguments: { id: ""},
-        },
-    }
-
     try {
+        await client.connect(transport);
+        console.log("Connected to server");
+        const req2: CallToolRequest = {
+            method: "tools/call",
+            params: {
+              name: "get_classes",
+              arguments: { id: ""},
+            },
+        }
         const res = await client.request(req2, CallToolResultSchema);
         console.log("Tool response:");
-     
+        let answer = "";
         res.content.forEach((item) => {
           if (item.type === "text") {
             console.log(item.text);
+            answer = item.text;
           } else {
             console.log(item.type + "content", item);
           }
         });
         console.log("------------------------------");
+        return answer;
       } catch (error) {
         console.error("Error calling tool:", error);
       }
