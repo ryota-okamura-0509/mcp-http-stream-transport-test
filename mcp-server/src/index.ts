@@ -5,6 +5,14 @@ import express from "express";
 import https from "https";
 import dotenv from "dotenv";
 
+dotenv.config();
+
+const clientId = process.env.CLIENT_ID ?? "";
+const clientSecret = process.env.CLIENT_SECRET ?? "";
+const username = process.env.USERNAME ?? "";
+const password = process.env.PASSWORD ?? "";
+const grantType = process.env.GRANT_TYPE ?? "";
+
 const agent = new https.Agent({
     rejectUnauthorized: false, // 証明書検証を無効化
   });
@@ -18,29 +26,6 @@ const transport: StreamableHTTPServerTransport =
   });
  
 const mcpServer = new McpServer({ name: "my-server", version: "0.0.1" });
- 
-// シンプルにサイコロを振った結果を返すツール
-mcpServer.tool(
-  // ツールの名前
-  "dice",
-  // ツールの説明
-  "サイコロを振った結果を返します",
-  // ツールの引数のスキーマ
-  { sides: z.number().min(1).default(6).describe("サイコロの面の数") },
-  // ツールが実行されたときの処理
-  async (input) => {
-    const sides = input.sides ?? 6;
-    const result = Math.floor(Math.random() * sides) + 1;
-    return {
-      content: [
-        {
-          type: "text",
-          text: result.toString(),
-        },
-      ],
-    };
-  }
-);
 
 mcpServer.tool(
     'get_classes',
@@ -50,20 +35,20 @@ mcpServer.tool(
         const { id } = input;
         // TODO; envにまとめたい
         const body = new URLSearchParams({
-          client_id: "",
-          client_secret: "",
-          username: '',
-          password: "",
-          grant_type: "",
+          client_id: clientId,
+          client_secret: clientSecret,
+          username: username,
+          password: password,
+          grant_type: grantType,
         });
         try {
-            const res = await fetch("url/oauth/token", {
+            const res = await fetch("https://localhost:1443/oauth/token", {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/x-www-form-urlencoded",
                   "Accept": "application/json",
                 },
-                body: body 
+                body: body,
             });
             console.log("Response:", res);
 
@@ -75,12 +60,12 @@ mcpServer.tool(
             const accessToken = data.access_token;
             console.log("Access Token:", accessToken);
 
-            const classRes = await fetch(`url/api/v1/classes?service_id=2&limit=50&offset=0`, {
+            const classRes = await fetch(`https://localhost:1443/api/v1/classes?service_id=${id}&limit=50&offset=0`, {
               method: "GET",
               headers: {
                 "Content-Type": "application/x-www-form-urlencoded",
                 "Accept": "application/json",
-                "Authorization": ``,
+                "Authorization": `Bearer ${accessToken}`,
               },
             });
 
@@ -107,6 +92,78 @@ mcpServer.tool(
             };
         }
     }
+)
+
+mcpServer.tool(
+  'get_member',
+  "園児情報の取得",
+  {id: z.string().describe("サービスID"), member_id: z.string().describe("園児ID")},
+  async (input) => {
+      const { id, member_id } = input;
+      // TODO; envにまとめたい
+      const body = new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        username: username,
+        password: password,
+        grant_type: grantType,
+      });
+      try {
+          const res = await fetch("https://localhost:1443/oauth/token", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Accept": "application/json",
+              },
+              body: body,
+          });
+          console.log("Response:", res);
+
+          if (!res.ok) {
+              throw new Error(`HTTP error! status: ${res.status}`);
+          }
+
+          const data = await res.json();
+          const accessToken = data.access_token;
+          console.log("Access Token:", accessToken);
+          const memberSearchRequest = {
+            service_ids: [id], // 配列形式
+            member_ids: [member_id], // 配列形式
+          };
+
+          const classRes = await fetch(`https://localhost:1443/api/v1/members/search`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify(memberSearchRequest),
+          });
+
+          const classes = await classRes.json();
+          console.log("対象クラス:", classes);
+          return {
+              content: [
+                  {
+                      type: "text",
+                      text: `対象クラス一覧: ${JSON.stringify(classes)}`,
+                  },
+              ],
+          };
+      } catch (error) {
+          console.error("Error:", error);
+          return {
+              content: [
+                  {
+                      type: "text",
+                      text: `Login failed: ${error.message}`,
+                  },
+              ],
+              isError: true,
+          };
+      }
+  }
 )
  
 const setupServer = async () => {
